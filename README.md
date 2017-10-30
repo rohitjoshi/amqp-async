@@ -1,5 +1,5 @@
 # amqp-async
-Non Blocking Queue based AMQP Client. Developed for using from Nginx/OpenResty stack
+Non Blocking Queue based AMQP Client. Developed for using from Nginx/OpenResty stack.  It depends on [rabbitmq-c](https://github.com/alanxz/rabbitmq-c)
 
 This is a AMQP implementation using q worker queue which allows clients to enque a message without blocking and worker thread will periodically publish to AMQP server.  
 
