@@ -75,6 +75,10 @@ public:
         if (!get_instance()._initialized) {
             return false;
         }
+        if (get_instance()._stop) {
+             spdlog::get(get_instance()._logger_name)->error("Stop function is invoked. No more messages allowed to enqueue");
+            return false;
+        }
         spdlog::get(get_instance()._logger_name)->debug("Enqueue a message:{}", msg);
         return get_instance()._publish_queue.enqueue(msg);
     }
@@ -174,7 +178,8 @@ public:
         //send heartbeat every 30 second
         unsigned heartbeat_threshold = _heartbeat_ms/_thead_sleep_ms;
         std::chrono::milliseconds queue_timeout(_thead_sleep_ms);
-        while(!_stop) {
+        bool no_more_messages = false;
+        while(!_stop && no_more_messages) {
             error_msg[0] = '\0';
             std::string item;
             if (_publish_queue.wait_dequeue_timed(item, queue_timeout)) {
@@ -183,13 +188,19 @@ public:
                     spdlog::get(_logger_name)->info("Message:%s\n", item.c_str());
                 }
                 counter = 0;
+                no_more_messages = false;
             }else {
                 counter++;
                 if (counter >= heartbeat_threshold) {
                     spdlog::get(_logger_name)->debug("Sending a heartbeat");
                     send_heartbeat(error_msg);
                     counter = 0;
+                    //drain the messages until next heartbeat
+                    if(_stop) {
+                        no_more_messages = true;
+                    }
                 }
+                
             }
             
         }
