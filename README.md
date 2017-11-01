@@ -15,8 +15,8 @@ C lang : Example:
   #include "ffi.h"
   int main(int argc, char** argv) {
     const char* uri = "amqp://guest:guest@localhost:5672/";
-    const char* exchange = "mobile-activity.in.exchange";
-    const char* routing_key = "mobile-activity.in.routing-key";
+    const char* exchange = "test-activity.in.exchange";
+    const char* routing_key = "test-activity.in.routing-key";
     const char* log_dir = "/tmp";
     const char* logfile_prefix = "amqp-async-test";
     unsigned log_level = 1;
