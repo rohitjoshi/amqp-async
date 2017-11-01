@@ -124,6 +124,7 @@
               10);
           //spdlog::set_async_mode(1048576); //queue size
           lightq_event_logger->set_level(level);
+          lightq_event_logger->set_pattern("[%Y-%b-%d %T.%e]: %v");
            printf("Created a event logfile: %s\n", event_logfile.c_str());
           return true;
       }

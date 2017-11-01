@@ -31,7 +31,7 @@ class client_instance {
 private:
 
     client_instance() : _conn(NULL), _stop(false), _thead_sleep_ms(1000),
-    _publish_queue(1000), _heartbeat_ms(30000), _logger_name("amqp_async_logger"), _exit(false) {
+    _publish_queue(1000), _heartbeat_ms(25000), _logger_name("amqp_async_logger"), _exit(false) {
 
     }
     client_instance(const client_instance& orig);
@@ -173,11 +173,15 @@ public:
     }
 
     bool send_heartbeat() {
-        if (!connect(true)) {
+        if (!connect(false)) {
             LOG_RET_FALSE("failed to connect");
         }
         if(_conn->send_heartbeat()) {
             LOG_RET_TRUE("")
+        }else {
+           if (!connect(true)) {
+                LOG_RET_FALSE("failed to connect");
+           }
         }
         LOG_RET_FALSE("")
     }

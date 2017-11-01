@@ -27,7 +27,7 @@ private:
     amqp_connection(const amqp_connection& orig);
 public:
 
-    amqp_connection(std::string logger_name) : _conn(NULL), _connected(false), _channel_max(200), _frame_max(131072), _heartbeat(10),
+    amqp_connection(std::string logger_name) : _conn(NULL), _connected(false), _channel_max(200), _frame_max(131072), _heartbeat(30),
     _method(AMQP_SASL_METHOD_PLAIN), _channel(1) {
         _props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
         _props.content_type = amqp_cstring_bytes("text/plain");
