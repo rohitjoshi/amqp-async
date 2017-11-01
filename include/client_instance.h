@@ -64,14 +64,14 @@ public:
         LOG_TRACE("_exchange:%s,_routing_key:%s",
                 get_instance()._exchange.c_str(), get_instance()._routing_key.c_str());
         
-        if (!get_instance().connect(false)) {
-             LOG_ERROR("Failed to connect to AMQP server. Retrying later. ");
-        }
+        
 
         get_instance()._initialized = true;
         get_instance()._thread = std::thread(
                 [&]() {
-                    
+                    if (!get_instance().connect(false)) {
+                        LOG_ERROR("Failed to connect to AMQP server. Retrying later. ");
+                    }
                     get_instance().run();
                 });
          LOG_RET_TRUE("Initialized");
