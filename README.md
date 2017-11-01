@@ -33,7 +33,7 @@ C lang : Example:
     }
     char* msg = "test message";
     if (!publish(msg)) {
-            printf("Failed to publish message: %u\n", i);
+            printf("Failed to publish message\n");
             return 0;
     }
     stop();
