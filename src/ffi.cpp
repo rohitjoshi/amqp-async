@@ -17,7 +17,7 @@
      * @log_dir : output log dir
      * @log_prefix : log file name
      */
-    int init(const char* uri, const char* exchange, const char* routing_key, 
+    bool init(const char* uri, const char* exchange, const char* routing_key, 
                 const char* log_dir, const char* logfile_prefix, unsigned log_level, char* error_msg){
         if(!uri) {
             sprintf(error_msg,"Failed to initialize. uri is null.\n");
@@ -40,16 +40,16 @@
             return -1;
             
         }
-        return client_instance::init(uri, exchange, routing_key, log_dir, logfile_prefix,  log_level, error_msg);
+        return client_instance::init(uri, exchange, routing_key, log_dir, logfile_prefix,  log_level);
     }
     
     /*
      * publish a message
      */
-    int publish(const char* msg){
+    bool publish(const char* msg){
         return client_instance::publish(msg);
     }
     
-    void stop() {
-        client_instance::stop();
+    bool stop() {
+        return client_instance::stop();
     }

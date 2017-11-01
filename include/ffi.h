@@ -28,19 +28,19 @@ extern "C" {
      * @log_dir : output log dir
      * @log_prefix : log file name
      */
-    int init(const char* uri, const char* exchange, const char* routing_key, 
+    bool init(const char* uri, const char* exchange, const char* routing_key, 
             const char* log_dir, const char* logfile_prefix, unsigned log_level, char* error_msg);
     
     /*
      * publish a message
      */
-    int publish(const char* msg);
+    bool publish(const char* msg);
     
     
     /**
      * Stop the thread
      */
-    void stop();
+    bool stop();
 
 
 #ifdef __cplusplus

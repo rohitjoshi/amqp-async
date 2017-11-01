@@ -14,9 +14,9 @@ GREP=grep
 NM=nm
 CCADMIN=CCadmin
 RANLIB=ranlib
-CC=gcc-4.9
-CCC=c++
-CXX=c++
+CC=/usr/local/bin/g++-4.9
+CCC=/usr/local/bin/g++-4.9
+CXX=/usr/local/bin/g++-4.9
 FC=gfortran
 AS=as
 
@@ -62,7 +62,7 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/libamqp_async.${CND_DLIB_EXT}: /opt/c
 
 ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/libamqp_async.${CND_DLIB_EXT}: ${OBJECTFILES}
 	${MKDIR} -p ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}
-	c++ -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/libamqp_async.${CND_DLIB_EXT} ${OBJECTFILES} ${LDLIBSOPTIONS} -dynamiclib -install_name libamqp_async.${CND_DLIB_EXT} -fPIC
+	/usr/local/bin/g++-4.9 -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/libamqp_async.${CND_DLIB_EXT} ${OBJECTFILES} ${LDLIBSOPTIONS} -dynamiclib -install_name libamqp_async.${CND_DLIB_EXT} -fPIC
 
 ${OBJECTDIR}/src/ffi.o: src/ffi.cpp 
 	${MKDIR} -p ${OBJECTDIR}/src

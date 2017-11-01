@@ -8,6 +8,7 @@
       <itemPath>include/atomicops.h</itemPath>
       <itemPath>include/client_instance.h</itemPath>
       <itemPath>include/ffi.h</itemPath>
+      <itemPath>include/log.h</itemPath>
       <itemPath>include/readerwriterqueue.h</itemPath>
     </logicalFolder>
     <logicalFolder name="ResourceFiles"
@@ -42,8 +43,11 @@
         <rebuildPropChanged>false</rebuildPropChanged>
       </toolsSet>
       <compileType>
+        <cTool>
+          <commandlineTool>/usr/local/bin/g++-4.9</commandlineTool>
+        </cTool>
         <ccTool>
-          <commandlineTool>c++</commandlineTool>
+          <commandlineTool>/usr/local/bin/g++-4.9</commandlineTool>
           <incDir>
             <pElem>/opt/capione/nginx/include</pElem>
             <pElem>include</pElem>
@@ -54,7 +58,7 @@
           <linkerAddLib>
             <pElem>/opt/capione/nginx/lib</pElem>
           </linkerAddLib>
-          <commandlineTool>c++</commandlineTool>
+          <commandlineTool>/usr/local/bin/g++-4.9</commandlineTool>
           <linkerLibItems>
             <linkerLibFileItem>/opt/capione/nginx/lib/librabbitmq.dylib</linkerLibFileItem>
           </linkerLibItems>
@@ -71,6 +75,8 @@
       <item path="include/client_instance.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/ffi.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="include/log.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/readerwriterqueue.h" ex="false" tool="3" flavor2="0">
       </item>
@@ -122,6 +128,8 @@
       <item path="include/client_instance.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/ffi.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="include/log.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/readerwriterqueue.h" ex="false" tool="3" flavor2="0">
       </item>

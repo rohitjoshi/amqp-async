@@ -19,173 +19,198 @@
 #include <amqp.h>
 #include <amqp_framing.h>
 
-class amqp_connection {
 
+
+class amqp_connection {
 private:
-    
+
     amqp_connection(const amqp_connection& orig);
 public:
-    amqp_connection(std::string logger_name):_logger_name(logger_name), _socket(NULL),_channel_max(200),_frame_max(131072),_heartbeat(10),
-        _method(AMQP_SASL_METHOD_PLAIN),_channel(1){
+
+    amqp_connection(std::string logger_name) : _conn(NULL), _connected(false), _channel_max(200), _frame_max(131072), _heartbeat(10),
+    _method(AMQP_SASL_METHOD_PLAIN), _channel(1) {
         _props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
         _props.content_type = amqp_cstring_bytes("text/plain");
         _props.delivery_mode = 2;
-        
+
     }
-    
-    int init(std::string& uri, std::string& exchange, std::string& routing_key, char* error_msg) {
-        
-         _exchange = exchange;
+
+    bool init(std::string& uri, std::string& exchange, std::string& routing_key) {
+        LOG_IN("uri:%s, exchange:%s, routing_key:%s", uri.c_str(), exchange.c_str(), routing_key.c_str());
+        _exchange = exchange;
         _routing_key = routing_key;
         _uri = uri;
-      
-        spdlog::get(_logger_name)->debug("Parse uri:{}", _uri.c_str());
-        int status = amqp_parse_url((char*)_uri.c_str(), &_ci);
+        
+        char uri_buffer[256];
+        strcpy(uri_buffer, _uri.c_str());
+
+        LOG_DEBUG("Parse uri:%s", uri_buffer);
+        int status = amqp_parse_url((char*) uri_buffer, &_ci);
         if (status) {
-             spdlog::get(_logger_name)->error("Failed to parse uri:{}", _uri.c_str());
-             strcpy(error_msg, "Failed to parse url");
-            return -1;
+            LOG_ERROR("Failed to parse uri:%s", _uri.c_str());
+            LOG_RET_FALSE("Failed to parse uri.")
         }
-        spdlog::get(_logger_name)->debug("vhost:{}, host: {}, Port:{}, user:{}, password:{}", _ci.vhost,_ci.host, _ci.port, _ci.user, _ci.password);
-            
-        _conn = amqp_new_connection();
-        _socket = amqp_tcp_socket_new(_conn);
-        if(!_socket) {
-            spdlog::get(_logger_name)->error("Failed  to create a tcp socke");
-            strcpy(error_msg, "Failed  to create a tcp socket");
-            return -1;
+        
+        amqp_connection_state_t conn = amqp_new_connection();
+        if (!conn) {
+            LOG_ERROR("Failed  to create a amqp_new_connection ");
+            LOG_RET_FALSE("Failed  to create a amqp_new_connection.");
         }
-        status = amqp_socket_open(_socket, _ci.host, _ci.port);
+        amqp_socket_t* socket = amqp_tcp_socket_new(conn);
+        if (!socket) {
+            LOG_ERROR("Failed  to create a tcp socket");
+            socket = NULL;
+            LOG_RET_FALSE("Failed  to create a tcp socket.");
+        }
+        
+        //non-blocking connection
+        struct timeval tval;
+        tval.tv_sec = 10;
+        tval.tv_usec = 0;
+        //status = amqp_socket_open_noblock(socket,_ci.host, _ci.port, &tval);
+        status = amqp_socket_open(socket, _ci.host, _ci.port);
         if (status) {
-            spdlog::get(_logger_name)->error("Failed to connect to host: {}, Port:{}", _ci.host, _ci.port);
-            sprintf(error_msg, "Failed to connect to host: %s, Port:%d\n", _ci.host, _ci.port);
-            return -1;
+            LOG_CRITICAL("Failed to connect to host: %s, Port:%d", _ci.host, _ci.port);
+            LOG_RET_FALSE("Failed to connect to host.");
         }
-        spdlog::get(_logger_name)->debug("Login: vhost:{}, channel_max:{}, _frame_max:{}, _heartbeat:{}, _method:{}, user:{}",
+        LOG_DEBUG("Login: vhost:%s, channel_max:%u, _frame_max:%u, _heartbeat:%u, _method:%d, user:%s",
                 _ci.vhost, _channel_max, _frame_max, _heartbeat, _method, _ci.user);
-        amqp_rpc_reply_t reply = amqp_login(_conn, (_ci.vhost && strlen(_ci.vhost)>0)?_ci.vhost:"/", _channel_max, _frame_max, _heartbeat, _method, _ci.user, _ci.password);
-        if(get_amqp_error(reply, (char*)"Logging in", error_msg)){
-            return -1;
+        
+        amqp_rpc_reply_t reply = amqp_login(conn, (_ci.vhost && strlen(_ci.vhost) > 0) ? _ci.vhost : "/", _channel_max, _frame_max, _heartbeat, _method, _ci.user, _ci.password);
+        if (!log_amqp_error(reply, (char*) "Logging in")) {
+            LOG_RET_FALSE("Failed to Login.");
         }
-        spdlog::get(_logger_name)->info("Login successful. Opening a channel");
-        
-        amqp_channel_open(_conn, _channel);
-        reply = amqp_get_rpc_reply(_conn);
-        if(get_amqp_error(reply, (char*)"Opening channel", error_msg)){
-            return -1;
+        LOG_INFO("Login successful. Opening a channel");
+
+        amqp_channel_open(conn, _channel);
+        reply = amqp_get_rpc_reply(conn);
+        if (!log_amqp_error(reply, (char*) "Opening channel")) {
+            LOG_RET_FALSE("Failed to open a channel.");
         }
-        spdlog::get(_logger_name)->info("Successfully opened channel");
-       
         
-        spdlog::get(_logger_name)->debug("_exchange:{},_routing_key:{}", _exchange.c_str(), _routing_key.c_str());
-        return 0;
-        
+        _conn = conn;
+        _connected = true;
+        LOG_INFO("Successfully opened channel");
+        LOG_RET_TRUE("success");
+
     }
-    
-    int publish(const char* message, char* error_msg) {
-        spdlog::get(_logger_name)->debug("Publishing message: {}", message);
+
+    bool publish(const char* message) {
+        LOG_IN("Publishing message: %s", message);
+        if(!_connected) {
+             LOG_RET_FALSE("Failed to send heartbeat. AMQP conn disconnected");
+         }
         amqp_bytes_t body_bytes = amqp_cstring_bytes(message);
         const char* context = "Publishing Message";
-        spdlog::get(_logger_name)->trace("Publishing exchange: {}, routing_key:{}", _exchange.c_str(), _routing_key.c_str());
+        LOG_TRACE("Publishing exchange: %s, routing_key:%s", _exchange.c_str(), _routing_key.c_str());
         int status = amqp_basic_publish(_conn, _channel, amqp_cstring_bytes(_exchange.c_str()),
                 amqp_cstring_bytes(_routing_key.c_str()), 0, 0, NULL, body_bytes);
-        
-        spdlog::get(_logger_name)->trace("publish status: {}", status);
-        if (get_error(status,context, error_msg)) {
-            spdlog::get(_logger_name)->error("Failed to publish message");
-            return -1;
+
+        LOG_TRACE("publish status: %d", status);
+        if(log_error(status, context)) {
+            LOG_RET_TRUE("Published successfully");
         }
-        spdlog::get(_logger_name)->trace("successfully published");
-        return body_bytes.len;
+        _connected = false;
+        LOG_RET_FALSE("Published failed");
     }
-    
-    int send_heartbeat(char* error_msg) {
+
+    bool send_heartbeat() {
+         LOG_IN("");
+         if(!_connected) {
+             LOG_RET_FALSE("Failed to send heartbeat. AMQP conn disconnected");
+         }
         const char* context = "Sending heartbeat";
         amqp_frame_t hb;
         hb.channel = 0;
         hb.frame_type = AMQP_FRAME_HEARTBEAT;
-        
+
         int status = amqp_send_frame(_conn, &hb);
-        if (get_error(status,context, error_msg)) {
-            return -1;
+        if(log_error(status, context)) {
+            LOG_RET_TRUE("Heartbeat sent successfully");
         }
-        return 0;
+        _connected = false;
+        LOG_RET_FALSE("Failed to send heartbeat");
+        
     }
     
-        
-        
+    bool is_connected() {
+        return _connected;
+    }
+
     virtual ~amqp_connection() {
-        //spdlog::get(_logger_name)->debug("Closing AMQP Channel");
-        amqp_channel_close(_conn, 1, AMQP_REPLY_SUCCESS);
-        //spdlog::get(_logger_name)->debug("Closing AMQP Connection");
-        amqp_connection_close(_conn, AMQP_REPLY_SUCCESS);
-        //spdlog::get(_logger_name)->debug("Destroying AMQP Connection");
-        amqp_destroy_connection(_conn);
+         LOG_IN("");
+            //LOG_DEBUG("Closing AMQP Channel");
+        if (_conn && _connected) {
+            amqp_channel_close(_conn, 1, AMQP_REPLY_SUCCESS);
+            //LOG_DEBUG("Closing AMQP Connection");
+            amqp_connection_close(_conn, AMQP_REPLY_SUCCESS);
+            //LOG_DEBUG("Destroying AMQP Connection");
+            amqp_destroy_connection(_conn);
+        }
+         LOG_OUT("")
     }
 private:
-    
-    
-    int get_amqp_error(amqp_rpc_reply_t x, const char *context, char* error)
-    {
-    switch (x.reply_type) {
-        case AMQP_RESPONSE_NORMAL:
-        spdlog::get(_logger_name)->debug("AMQP_RESPONSE_NORMAL");
-        return 0;
 
-        case AMQP_RESPONSE_NONE:
-        sprintf(error, "%s: missing RPC reply type!\n", context);
-        spdlog::get(_logger_name)->error("AMQP_RESPONSE_LIBRARY_EXCEPTION: {}", error);
-        break;
+    bool log_amqp_error(amqp_rpc_reply_t x, const char *context) {
+         LOG_IN("");
+        char error[256];
+        switch (x.reply_type) {
+            case AMQP_RESPONSE_NORMAL:
+                LOG_DEBUG("AMQP_RESPONSE_NORMAL");
+                LOG_RET_TRUE("AMQP_RESPONSE_NORMAL: success");
 
-        case AMQP_RESPONSE_LIBRARY_EXCEPTION:
-        sprintf(error, "%s: %s\n", context, amqp_error_string2(x.library_error));
-        spdlog::get(_logger_name)->error("AMQP_RESPONSE_LIBRARY_EXCEPTION: {}", error);
-
-        break;
-
-        case AMQP_RESPONSE_SERVER_EXCEPTION:
-        switch (x.reply.id) {
-            case AMQP_CONNECTION_CLOSE_METHOD: {
-                amqp_connection_close_t *m = (amqp_connection_close_t *) x.reply.decoded;
-                sprintf(error, "%s: server connection error %d, message: %.*s\n",
-                    context,
-                    m->reply_code,
-                    (int) m->reply_text.len, (char *) m->reply_text.bytes);
-                spdlog::get(_logger_name)->debug("AMQP_CONNECTION_CLOSE_METHOD: {}", error);
+            case AMQP_RESPONSE_NONE:
+                LOG_INFO("AMQP_RESPONSE_NONE: %s: missing RPC reply type!\n", context);
                 break;
-            }
-            case AMQP_CHANNEL_CLOSE_METHOD: {
-                amqp_channel_close_t *m = (amqp_channel_close_t *) x.reply.decoded;
-                sprintf(error, "%s: server channel error %d, message: %.*s\n",
-                    context,
-                    m->reply_code,
-                    (int) m->reply_text.len, (char *) m->reply_text.bytes);
-                spdlog::get(_logger_name)->error("AMQP_CHANNEL_CLOSE_METHOD: {}", error);
+
+            case AMQP_RESPONSE_LIBRARY_EXCEPTION:
+                LOG_ERROR("AMQP_RESPONSE_LIBRARY_EXCEPTION: %s: %s\n", context, amqp_error_string2(x.library_error));
                 break;
-            }
-            default:
-            sprintf(error, "%s: unknown server error, method id 0x%08X\n", context, x.reply.id);
-            spdlog::get(_logger_name)->error("default: {}", error);
-            break;
+
+            case AMQP_RESPONSE_SERVER_EXCEPTION:
+                switch (x.reply.id) {
+                    case AMQP_CONNECTION_CLOSE_METHOD:
+                    {
+                        amqp_connection_close_t *m = (amqp_connection_close_t *) x.reply.decoded;
+                        LOG_ERROR("AMQP_CONNECTION_CLOSE_METHOD: %s: server connection error %d, message: %.*s\n",
+                                context,
+                                m->reply_code,
+                                (int) m->reply_text.len, (char *) m->reply_text.bytes);
+                        
+                        break;
+                    }
+                    case AMQP_CHANNEL_CLOSE_METHOD:
+                    {
+                        amqp_channel_close_t *m = (amqp_channel_close_t *) x.reply.decoded;
+                        LOG_ERROR("AMQP_CHANNEL_CLOSE_METHOD: %s: server channel error %d, message: %.*s\n",
+                                context,
+                                m->reply_code,
+                                (int) m->reply_text.len, (char *) m->reply_text.bytes);
+                        break;
+                    }
+                    default:
+                        LOG_ERROR("Default: %s: unknown server error, method id 0x%08X\n", context, x.reply.id);
+                        break;
+                }
+                break;
         }
-        break;
+
+       LOG_RET_FALSE("");
     }
 
-    return 1;
-    }
-    int get_error(int x, const char* context, char* error)
-    {
+    bool log_error(int x, const char* context) {
         if (x < 0) {
-        sprintf(error, "%s: %s\n", context, amqp_error_string2(x));
-        return 1;
+            LOG_ERROR("%s: %s", context, amqp_error_string2(x));
+            LOG_RET_FALSE("returning false");
         }
-    return 0;
+        LOG_RET_TRUE("success");
     }
-    
-    
+
+
     amqp_connection_state_t _conn;
+    bool _connected;
     amqp_basic_properties_t _props;
-    amqp_socket_t *_socket;
+    //amqp_socket_t *_socket;
     struct amqp_connection_info _ci;
     unsigned _channel_max;
     unsigned _frame_max;
@@ -195,8 +220,8 @@ private:
     std::string _exchange;
     std::string _uri;
     std::string _routing_key;
-    std::string _logger_name;
     
+
 
 };
 
