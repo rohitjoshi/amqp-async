@@ -12,6 +12,8 @@ luajit amqp_test.lua
 C lang : Example:
 
 ```
+  #include "ffi.h"
+  int main(int argc, char** argv) {
     const char* uri = "amqp://guest:guest@localhost:5672/";
     const char* exchange = "mobile-activity.in.exchange";
     const char* routing_key = "mobile-activity.in.routing-key";
@@ -35,5 +37,6 @@ C lang : Example:
             return 0;
     }
     stop();
+  }
 ```
     
