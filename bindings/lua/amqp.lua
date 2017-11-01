@@ -12,13 +12,16 @@ local _M = { _VERSION = '0.01' }
 local mt = { __index = _M }
 
 local logging_level = {
-    trace = 0,
-    debug = 1,
-    info = 2,
-    warn = 3,
-    err = 4,
-    critical = 5,
-    off = 6
+    trace    = 0,
+    debug    = 1,
+    info     = 2,
+    notice   = 3,
+    warn     = 4,
+    err      = 5,
+    critical = 6,
+    alert    = 7,
+    emerg    = 8,
+    off      = 9
 }
 
 
@@ -26,7 +29,7 @@ ffi.cdef([[
 
 int init(const uint8_t* uri, const uint8_t* exchange, const uint8_t* routing_key, const uint8_t* log_dir, const uint8_t* logfile_prefix, uint32_t log_level, uint8_t* error_msg);
 int publish(const uint8_t* msg);
-void stop();
+int stop();
 
 ]])
 
@@ -70,13 +73,14 @@ function _M:init(uri, exchange, routing_key, log_dir, logfile_prefix, log_level)
 	local logfile_prefix_buf = ffi_new("unsigned char[?]", #logfile_prefix)
 	ffi.copy(logfile_prefix_buf, logfile_prefix, #logfile_prefix)
     
-    local error_msg = ffi_new("unsigned char[?]", 256)
-     local level = logging_level[log_level]
-     if not level then
-     	level = logging_level["info"]
-     end
+        local error_msg = ffi_new("unsigned char[?]", 256)
+        local level = logging_level[log_level]
+        if not level then
+     	  level = logging_level["info"]
+        end
+        print("Using log level:" .. level)
 	local status = self.ctx.init(uri_buff, exchange_buff, routing_key_buff, log_dir_buf, logfile_prefix_buf, level, error_msg)
-	if status ~= 0 then
+	if status == 0  then
 		return nil,  ffi.string(error_msg, 256)
 	end
 	return true
@@ -86,7 +90,7 @@ function _M:publish(message)
 	local message_buff = ffi_new("unsigned char[?]", #message+1)
 	ffi.copy(message_buff, message, #message)
 	local status = self.ctx.publish(message_buff)
-	if status ~= 0 then
+	if status == 0   then
 		return nil, "Failed to publish message. " 
 	end
 	return success
@@ -94,7 +98,11 @@ end
 
 -- NOTE: this is a blocking call until queue wait time
 function _M:stop()
-	self.ctx.stop()
+	local status = self.ctx.stop()
+        if status == 0  then
+		return nil, "Failed to publish message. " 
+	end
+	return success
 end
 
 return _M

@@ -1,26 +1,7 @@
-/*************************************************************************/
-/* spdlog - an extremely fast and easy to use c++11 logging library.     */
-/* Copyright (c) 2014 Gabi Melman.                                       */
-/*                                                                       */
-/* Permission is hereby granted, free of charge, to any person obtaining */
-/* a copy of this software and associated documentation files (the       */
-/* "Software"), to deal in the Software without restriction, including   */
-/* without limitation the rights to use, copy, modify, merge, publish,   */
-/* distribute, sublicense, and/or sell copies of the Software, and to    */
-/* permit persons to whom the Software is furnished to do so, subject to */
-/* the following conditions:                                             */
-/*                                                                       */
-/* The above copyright notice and this permission notice shall be        */
-/* included in all copies or substantial portions of the Software.       */
-/*                                                                       */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
-/*************************************************************************/
+//
+// Copyright(c) 2015 Gabi Melman.
+// Distributed under the MIT License (http://opensource.org/licenses/MIT)
+//
 
 #pragma once
 
@@ -28,21 +9,47 @@
 #include <initializer_list>
 #include <chrono>
 #include <memory>
+#include <atomic>
+#include <exception>
+#include<functional>
 
-//visual studio does not support noexcept yet
-#ifndef _MSC_VER
-#define SPDLOG_NOEXCEPT noexcept
-#else
-#define SPDLOG_NOEXCEPT throw()
+#if defined(_WIN32) && defined(SPDLOG_WCHAR_FILENAMES)
+#include <codecvt>
+#include <locale>
 #endif
 
-// under linux, you can use the much faster CLOCK_REALTIME_COARSE clock.
-// this clock is less accurate - can be off by few millis - depending on the kernel HZ
-// uncomment to use it instead of the regular (and slower) clock
+#include "spdlog/details/null_mutex.h"
 
-//#ifdef __linux__
-//#define SPDLOG_CLOCK_COARSE
-//#endif
+//visual studio upto 2013 does not support noexcept nor constexpr
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+#define SPDLOG_NOEXCEPT throw()
+#define SPDLOG_CONSTEXPR
+#else
+#define SPDLOG_NOEXCEPT noexcept
+#define SPDLOG_CONSTEXPR constexpr
+#endif
+
+// See tweakme.h
+#if !defined(SPDLOG_FINAL)
+#define SPDLOG_FINAL
+#endif
+
+#if defined(__GNUC__)  || defined(__clang__)
+#define SPDLOG_DEPRECATED __attribute__((deprecated))
+#elif defined(_MSC_VER)
+#define SPDLOG_DEPRECATED __declspec(deprecated)
+#else
+#define SPDLOG_DEPRECATED
+#endif
+
+#ifdef __linux__
+#include <cxxabi.h>
+#define SPDLOG_CATCH_ALL catch (abi::__forced_unwind&) { _err_handler("Unknown exception"); throw; } catch (...)
+#else // __linux__
+#define SPDLOG_CATCH_ALL catch (...)
+#endif // __linux__
+
+#include "spdlog/fmt/fmt.h"
 
 namespace spdlog
 {
@@ -54,11 +61,17 @@ namespace sinks
 class sink;
 }
 
-// Common types across the lib
 using log_clock = std::chrono::system_clock;
-using sink_ptr = std::shared_ptr < sinks::sink > ;
-using sinks_init_list = std::initializer_list < sink_ptr > ;
+using sink_ptr = std::shared_ptr < sinks::sink >;
+using sinks_init_list = std::initializer_list < sink_ptr >;
 using formatter_ptr = std::shared_ptr<spdlog::formatter>;
+#if defined(SPDLOG_NO_ATOMIC_LEVELS)
+using level_t = details::null_atomic_int;
+#else
+using level_t = std::atomic<int>;
+#endif
+
+using log_err_handler = std::function<void(const std::string &err_msg)>;
 
 //Log level enum
 namespace level
@@ -77,7 +90,10 @@ typedef enum
     off      = 9
 } level_enum;
 
-static const char* level_names[] { "trace", "debug", "info", "notice", "warning", "error", "critical", "alert", "emerg", "off"};
+#if !defined(SPDLOG_LEVEL_NAMES)
+#define SPDLOG_LEVEL_NAMES { "trace", "debug", "info", "notice", "warning", "error", "critical", "alert", "emerg", "off"};
+#endif
+static const char* level_names[] SPDLOG_LEVEL_NAMES
 
 static const char* short_level_names[] { "T", "D", "I", "N", "W", "E", "C", "A", "M", "O"};
 
@@ -102,14 +118,35 @@ enum class async_overflow_policy
     discard_log_msg // Discard the message it enqueue fails
 };
 
+//
+// Pattern time - specific time getting to use for pattern_formatter.
+// local time by default
+//
+enum class pattern_time_type
+{
+    local, // log localtime
+    utc    // log utc
+};
 
 //
 // Log exception
 //
-class spdlog_ex : public std::exception
+namespace details
+{
+namespace os
+{
+std::string errno_str(int err_num);
+}
+}
+class spdlog_ex: public std::exception
 {
 public:
-    spdlog_ex(const std::string& msg) :_msg(msg) {}
+    spdlog_ex(const std::string& msg):_msg(msg)
+    {}
+    spdlog_ex(const std::string& msg, int last_errno)
+    {
+        _msg = msg + ": " + details::os::errno_str(last_errno);
+    }
     const char* what() const SPDLOG_NOEXCEPT override
     {
         return _msg.c_str();
@@ -118,5 +155,15 @@ private:
     std::string _msg;
 
 };
+
+//
+// wchar support for windows file names (SPDLOG_WCHAR_FILENAMES must be defined)
+//
+#if defined(_WIN32) && defined(SPDLOG_WCHAR_FILENAMES)
+using filename_t = std::wstring;
+#else
+using filename_t = std::string;
+#endif
+
 
 } //spdlog

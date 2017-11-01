@@ -67,8 +67,8 @@ public:
         struct timeval tval;
         tval.tv_sec = 10;
         tval.tv_usec = 0;
-        //status = amqp_socket_open_noblock(socket,_ci.host, _ci.port, &tval);
-        status = amqp_socket_open(socket, _ci.host, _ci.port);
+        status = amqp_socket_open_noblock(socket,_ci.host, _ci.port, &tval);
+        //status = amqp_socket_open(socket, _ci.host, _ci.port);
         if (status) {
             LOG_CRITICAL("Failed to connect to host: %s, Port:%d", _ci.host, _ci.port);
             LOG_RET_FALSE("Failed to connect to host.");

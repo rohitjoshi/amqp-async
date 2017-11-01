@@ -182,8 +182,13 @@
 
           }
 
+          
+       
           if (logger()->should_log((spdlog::level::level_enum) logtype)) {
-              logger()->force_log((spdlog::level::level_enum) logtype, szBuf);
+              if(logtype == log::LOG_EVENT) {
+                event_logger()->log((spdlog::level::level_enum)logtype, szBuf);
+              }
+              logger()->log((spdlog::level::level_enum) logtype, szBuf);
               //  logger()->force_log((spdlog::level::level_enum)logtype,"|%5d|%8X|%s:%u|%s%s", PID, (tid & 0xffffffff), filename, line, func_inout.c_str(), msg.c_str());
           }
 

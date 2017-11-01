@@ -51,7 +51,7 @@ public:
         if (get_instance()._initialized) {
             LOG_RET_TRUE("Already initialized");
         }
-        if(!log::init(log_dir, logfile_prefix, spdlog::level::level_enum::trace)) {
+        if(!log::init(log_dir, logfile_prefix, (spdlog::level::level_enum)log_level)) {
             printf("Failed to initialize logger\n.");
             return false;
         }
@@ -193,13 +193,16 @@ public:
         while (!_stop && !more_messages) {
             std::string item;
             if (_publish_queue.wait_dequeue_timed(item, queue_timeout)) {
-                if (!amqp_publish(item.c_str(), 3)) {
-                    LOG_ERROR("Failed to publish message. ");
-                    LOG_INFO("Message:%s\n", item.c_str());
+                if (!amqp_publish(item.c_str(), 2)) {
+                    LOG_ERROR("Failed to publish message. Writing to event log ");
+                    LOG_EVENT( item.c_str());
+                }else {
+                    LOG_INFO("Message published successfully")
                 }
                 counter = 0;
                 more_messages = false;
             } else {
+                
                 counter++;
                 if (counter >= heartbeat_threshold) {
                     LOG_DEBUG("Sending a heartbeat");

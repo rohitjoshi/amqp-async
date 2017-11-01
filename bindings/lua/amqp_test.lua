@@ -1,10 +1,10 @@
 
-local lib_path = "../../dist/Release/GNU-MacOSX/libamqp_async.dylib"
+local lib_path = "libamqp_async.dylib"
 local amqp = require("amqp"):new(lib_path)
 
 local uri = "amqp://guest:guest@localhost:5672/"
-local exchange = "test.exchange"
-local routing_key = "test.routing-key"
+local exchange = "mobile-activity.in.exchange"
+local routing_key = "mobile-activity.in.routing-key"
 local log_dir = "/tmp"
 local logfile_prefix = "amqp-async"
 local log_level = "info"
@@ -29,13 +29,21 @@ end
 
 for i=1,100000 do
 	local ok, err = amqp:publish("test message:" .. i)
+        if err then
+           print("Failed to publish message");
+        else
+         print("Published test message:" .. i)
+         sleep(0.01)
+       end
 end
-
 sleep(5)
 
 for i=1,100000 do
 	local ok, err = amqp:publish("test message:" .. i)
 	sleep(0.01)
+        if err then
+           print("Failed to publish message");
+        end
 end
 
 sleep(300)
